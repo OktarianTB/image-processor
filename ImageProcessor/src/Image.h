@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <cmath>
 #include <complex>
+#include <vector>
 #define _USE_MATH_DEFINES
 
 enum ImageType
@@ -44,7 +45,9 @@ struct Image
 
 	Image& overlay(const Image& source, int x, int y);
 
-	Image& gaussian_blur();
+	Image& pixelize(int strength = 2);
+
+	Image& gaussian_blur(int strength = 2);
 
 	Image& std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, 
 		uint32_t kernel_height, double kernel[], uint32_t cr, uint32_t cc);

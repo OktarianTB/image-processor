@@ -4,8 +4,10 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 #include <iostream>
-
 #define BYTE_BOUND(x) x < 0 ? 0 : (x > 255 ? 255 : x)
+
+using namespace std;
+
 
 Image::Image(const char* filename)
 {
@@ -124,7 +126,7 @@ Image& Image::flipY()
 
 Image& Image::crop(uint16_t cx, uint16_t cy, uint16_t ch, uint16_t cw)
 {
-	size_t size = cw * ch * channels;
+	size = cw * ch * channels;
 	uint8_t* croppedImage = new uint8_t[size];
 	memset(croppedImage, 0, size);
 
@@ -313,6 +315,56 @@ Image& Image::overlay(const Image& source, int x, int y)
 	return *this;
 }
 
+Image& Image::pixelize(int strength)
+{
+	int new_width = width - (width % strength);
+	int new_height = height - (height % strength);
+	int new_size = new_width * new_height * channels;
+
+	uint8_t* dst = new uint8_t[new_size];
+	memset(dst, 0, new_size);
+
+	for (uint16_t y = 0; y < new_height; y += strength)
+	{
+		for (uint16_t x = 0; x < new_width; x += strength)
+		{
+			for (int channel = 0; channel < channels; ++channel)
+			{
+				double sum = 0;
+
+				for (int i = y; i < y + strength; ++i)
+				{
+					for (int j = x; j < x + strength; ++j)
+					{
+						sum += data[(i * width + j) * channels + channel];
+					}
+				}
+				
+				uint8_t new_value = round(sum / (strength * strength));
+
+				for (int i = y; i < y + strength; ++i)
+				{
+					for (int j = x; j < x + strength; ++j)
+					{
+						int index = (i * new_width + j) * channels + channel;
+						dst[index] = BYTE_BOUND(new_value);
+					}
+				}
+			}
+		}
+	}
+
+	delete[] data;
+	data = dst;
+	dst = nullptr;
+
+	width = new_width;
+	height = new_height;
+	size = new_size;
+
+	return *this;
+}
+
 int get_border_values(int M, int x)
 {
 	if (x < 0)
@@ -327,16 +379,40 @@ int get_border_values(int M, int x)
 	return x;
 }
 
-Image& Image::gaussian_blur()
+Image& Image::gaussian_blur(int strength)
 {
 	// Coefficients of a 1-dimensional gaussian kernel with sigma = 1
-	double kernel[] = { 0.0545, 0.2442, 0.4026, 0.2442, 0.0545 };
+	std::vector<double> kernel;
+	int kernel_length = 3;
+	
+	switch (strength)
+	{
+	case 1:
+		kernel = { 0.27901,	0.44198, 0.27901 };
+		break;
+	case 2:
+		kernel = { 0.06136,	0.24477, 0.38774, 0.24477, 0.06136 };
+		kernel_length = 5;
+		break;
+	case 3:
+		kernel = { 0.00598,	0.060626, 0.241843, 0.383103, 0.241843, 0.060626, 0.00598 };
+		kernel_length = 7;
+		break;
+	case 4:
+		kernel = { 0.000229, 0.005977, 0.060598, 0.241732, 0.382928, 0.241732, 0.060598, 0.005977, 0.000229 };
+		kernel_length = 9;
+		break;
+	default:
+		kernel = { 0.27901,	0.44198, 0.27901 };
+	}
 
 	uint8_t* temp = new uint8_t[size];
 	uint8_t* dst = new uint8_t[size];
 
 	memset(temp, 0, size);
 	memset(dst, 0, size);
+
+	int N = (kernel_length - 1) / 2;
 
 	// Apply blur along Y axis
 	for (int y = 0; y < height; ++y)
@@ -347,12 +423,13 @@ Image& Image::gaussian_blur()
 			{
 				double sum = 0;
 
-				for (int i = -2; i <= 2; i++) {
+				for (int i = -N; i <= N; i++) {
 					int index = (get_border_values(height, y + i) * width + x) * channels + channel;
-					sum += kernel[i + 2] * data[index];
+					sum += kernel[i + N] * data[index];
 				}
 				
-				temp[(y * width + x) * channels + channel] = (uint8_t)BYTE_BOUND(round(sum));
+				uint8_t new_value = round(sum);
+				temp[(y * width + x) * channels + channel] = BYTE_BOUND(new_value);
 			}
 		}
 	}
@@ -367,12 +444,13 @@ Image& Image::gaussian_blur()
 			{
 				double sum = 0;
 
-				for (int i = -2; i <= 2; i++) {
+				for (int i = -N; i <= N; i++) {
 					int index = (y * width + get_border_values(width, x + i)) * channels + channel;
-					sum += kernel[i + 2] * temp[index];
+					sum += kernel[i + N] * temp[index];
 				}
 
-				dst[(y * width + x) * channels + channel] = (uint8_t)BYTE_BOUND(round(sum));
+				uint8_t new_value = round(sum);
+				dst[(y * width + x) * channels + channel] = BYTE_BOUND(new_value);
 			}
 		}
 	}
@@ -391,7 +469,7 @@ Image& Image::gaussian_blur()
 Image& Image::std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, uint32_t kernel_height, double kernel[], uint32_t cr, uint32_t cc)
 {
 	uint8_t* new_data = new uint8_t[width * height];
-	uint64_t center = (uint32_t)cr * kernel_width + (uint32_t)cc;
+	uint64_t center = (uint64_t)cr * kernel_width + (uint32_t)cc;
 	printf("%" PRIu64 "\n", center);
 
 	for (int i = 0; i < 9; ++i)

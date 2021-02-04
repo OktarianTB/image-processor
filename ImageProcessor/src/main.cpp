@@ -5,10 +5,10 @@
 
 int main()
 {
-	Image test("color.png");
+	Image test("june2.png");
 
-	test.gaussian_blur();
-	test.write("color-blurred3.png");
+	test.pixelize(15);
+	test.write("june-pixelize15.png");
 
 	std::cout << "Finished processing images." << std::endl;
 	std::cin.get();
