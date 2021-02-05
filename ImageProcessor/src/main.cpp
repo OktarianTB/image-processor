@@ -5,10 +5,13 @@
 
 int main()
 {
-	Image test("june2.png");
+	Image img("flower.png");
 
-	test.pixelize(15);
-	test.write("june-pixelize15.png");
+	if (img.is_valid())
+	{
+		img.edge_detection();
+		img.write("flower-edge5.jpg");
+	}
 
 	std::cout << "Finished processing images." << std::endl;
 	std::cin.get();

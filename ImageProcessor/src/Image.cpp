@@ -5,6 +5,7 @@
 #include "stb_image_write.h"
 #include <iostream>
 #define BYTE_BOUND(x) x < 0 ? 0 : (x > 255 ? 255 : x)
+#define MAP_BLACK_WHITE(x) x < 115 ? 0 : 255;
 
 using namespace std;
 
@@ -15,6 +16,7 @@ Image::Image(const char* filename)
 	{
 		printf("Successfully read %s\n", filename);
 		size = width * height * channels;
+		valid = true;
 	}
 	else
 		printf("Failed to read %s :(\n", filename);
@@ -465,15 +467,74 @@ Image& Image::gaussian_blur(int strength)
 	return *this;
 }
 
+Image& Image::edge_detection()
+{
+	grayscale_avg();
+
+	int sobel_kernel_x[] = {1, 0, -1, 2, 0, -2, 1, 0, -1};
+	int sobel_kernel_y[] = { -1, -2, -1, 0, 0, 0, 1, 2, 1 };
+
+	int8_t* tempX = new int8_t[size];
+	int8_t* tempY = new int8_t[size];
+
+	memset(tempX, 0, size);
+	memset(tempY, 0, size);
+
+	// Apply edge detection kernel along X axis
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			for (int channel = 0; channel < channels; ++channel)
+			{
+				int8_t sum = 0;
+
+				for (int i = -1; i <= 1; i++) {
+					int index = (get_border_values(height, y + i) * width + x) * channels + channel;
+					sum += sobel_kernel_x[i + 1] * data[index];
+				}
+
+				tempX[(y * width + x) * channels + channel] = sum;
+			}
+		}
+	}
+
+
+	// Apply edge detection kernel along Y axis
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			for (int channel = 0; channel < channels; ++channel)
+			{
+				int8_t sum = 0;
+
+				for (int i = -1; i <= 1; i++) {
+					int index = (y * width + get_border_values(width, x + i)) * channels + channel;
+					sum += sobel_kernel_y[i + 1] * data[index];
+				}
+
+				tempY[(y * width + x) * channels + channel] = sum;
+			}
+		}
+	}
+
+	for (size_t i = 0; i < size; ++i)
+	{
+		data[i] = MAP_BLACK_WHITE(round(sqrt(tempX[i] * tempX[i] + tempY[i] * tempY[i])));
+	}
+
+	delete[] tempX;
+	delete[] tempY;
+	return *this;
+}
+
 
 Image& Image::std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, uint32_t kernel_height, double kernel[], uint32_t cr, uint32_t cc)
 {
 	uint8_t* new_data = new uint8_t[width * height];
 	uint64_t center = (uint64_t)cr * kernel_width + (uint32_t)cc;
-	printf("%" PRIu64 "\n", center);
-
-	for (int i = 0; i < 9; ++i)
-		std::cout << kernel[i] << std::endl;
+	//printf("%" PRIu64 "\n", center);
 
 	for (uint64_t k = channel; k < size; k += channels)
 	{
@@ -481,7 +542,7 @@ Image& Image::std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, ui
 		long i = -((long)cr);
 		long end = (long)kernel_height - cr;
 		//std::cout << "i: " << i << " - " << end << std::endl;
-		while (i < end - 1)
+		while (i < end)
 		{
 			i++;
 			long row = ((long)k / channels) / width - i;
@@ -493,7 +554,7 @@ Image& Image::std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, ui
 			long j = -((long)cc);
 			long inner_end = (long)kernel_width - cc;
 			//std::cout << "j: " << j << " - " << inner_end << std::endl;
-			while (j < inner_end - 1)
+			while (j < inner_end)
 			{
 				j++;
 				long col = ((long)k / channels) % width - j;
@@ -507,11 +568,14 @@ Image& Image::std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, ui
 				//std::cout << "index: " << index << std::endl;
 
 				c += kernel[index] * data[(row * width + col) * channels + channel];
+				cout << kernel[index] * data[(row * width + col) * channels + channel] << endl;
 			}
 		}
 
 		new_data[k / channels] = (uint8_t)BYTE_BOUND(round(c));
-		//printf("%" PRIu8 "\n", k);
+		cout << "total: " << round(c) << endl;
+		cout << "----------------" << endl;
+		//printf("%" PRIu8 "\n", (uint8_t)round(c));
 		//printf("New Data:%" PRIu8 "\n", new_data[k / channels]);
 		
 	}

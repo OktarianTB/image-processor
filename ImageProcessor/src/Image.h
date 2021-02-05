@@ -19,6 +19,7 @@ struct Image
 	int width;
 	int height;
 	int channels;
+	bool valid = false;
 
 	Image(const char* filename);
 	Image(int w, int h, int channels);
@@ -27,6 +28,7 @@ struct Image
 
 	bool read(const char* filename);
 	bool write(const char* filename);
+	inline bool is_valid() { return valid; }
 
 	ImageType getFileType(const char* filename);
 
@@ -48,6 +50,7 @@ struct Image
 	Image& pixelize(int strength = 2);
 
 	Image& gaussian_blur(int strength = 2);
+	Image& edge_detection();
 
 	Image& std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, 
 		uint32_t kernel_height, double kernel[], uint32_t cr, uint32_t cc);
