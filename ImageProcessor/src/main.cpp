@@ -5,12 +5,12 @@
 
 int main()
 {
-	Image img("flower.jpg");
+	Image img("engine.png");
 
 	if (img.is_valid())
 	{
-		img.scale(2.5);
-		img.write("flower-resized.png");
+		img.edge_detection();
+		img.write("engine-edge6.jpg");
 	}
 
 	std::cout << "Finished processing images." << std::endl;

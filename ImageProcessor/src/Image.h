@@ -53,6 +53,7 @@ struct Image
 
 	Image& gaussian_blur(int strength = 2);
 	Image& edge_detection();
+	Image& sharpen();
 
 	Image& std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, 
 		uint32_t kernel_height, double kernel[], uint32_t cr, uint32_t cc);

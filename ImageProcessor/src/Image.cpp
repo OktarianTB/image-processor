@@ -538,8 +538,12 @@ Image& Image::edge_detection()
 				int8_t sum = 0;
 
 				for (int i = -1; i <= 1; i++) {
-					int index = (get_border_values(height, y + i) * width + x) * channels + channel;
-					sum += sobel_kernel_x[i + 1] * data[index];
+					for (int j = -1; j <= 1; ++j)
+					{
+						int kernel_index = 4 + i * 3 + j;
+						int index = (get_border_values(height, y + i) * width + get_border_values(width, x + j)) * channels + channel;
+						sum += sobel_kernel_x[kernel_index] * data[index];
+					}
 				}
 
 				tempX[(y * width + x) * channels + channel] = sum;
@@ -558,8 +562,12 @@ Image& Image::edge_detection()
 				int8_t sum = 0;
 
 				for (int i = -1; i <= 1; i++) {
-					int index = (y * width + get_border_values(width, x + i)) * channels + channel;
-					sum += sobel_kernel_y[i + 1] * data[index];
+					for (int j = -1; j <= 1; ++j)
+					{
+						int kernel_index = 4 + i * 3 + j;
+						int index = (get_border_values(height, y + i) * width + get_border_values(width, x + j)) * channels + channel;
+						sum += sobel_kernel_y[kernel_index] * data[index];
+					}
 				}
 
 				tempY[(y * width + x) * channels + channel] = sum;
@@ -574,6 +582,12 @@ Image& Image::edge_detection()
 
 	delete[] tempX;
 	delete[] tempY;
+	return *this;
+}
+
+Image& Image::sharpen()
+{
+	
 	return *this;
 }
 
