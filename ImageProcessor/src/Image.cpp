@@ -15,6 +15,7 @@ Image::Image(const char* filename)
 	if (read(filename))
 	{
 		printf("Successfully read %s\n", filename);
+		cout << "Image has width = " << width << " and height = " << height << endl;
 		size = width * height * channels;
 		valid = true;
 	}
@@ -152,6 +153,53 @@ Image& Image::crop(uint16_t cx, uint16_t cy, uint16_t ch, uint16_t cw)
 	croppedImage = nullptr;
 
 	return *this;
+}
+
+Image& Image::resize(int new_width, int new_height)
+{
+	
+
+	double x_ratio = width / (double)new_width;
+	double y_ratio = height / (double)new_height;
+
+	int new_size = new_width * new_height * channels;
+	uint8_t* dst = new uint8_t[new_size];
+	memset(dst, 0, new_size);
+
+	for (uint16_t y = 0; y < new_height; ++y)
+	{
+		for (uint16_t x = 0; x < new_width; ++x)
+		{
+			int px = x * x_ratio;
+			int py = y * y_ratio;
+
+			int dstIndex = (y * new_width + x) * channels;
+			int srcIndex = (py * width + px) * channels;
+
+			for (int channel = 0; channel < channels; ++channel)
+			{
+				dst[dstIndex + channel] = data[srcIndex + channel];
+			}
+		}
+	}
+
+	delete[] data;
+	data = dst;
+	dst = nullptr;
+
+	width = new_width;
+	height = new_height;
+	size = new_size;
+
+	return *this;
+}
+
+Image& Image::scale(double ratio)
+{
+	int new_width = ratio * width;
+	int new_height = ratio * height;
+
+	return resize(new_width, new_height);
 }
 
 Image& Image::grayscale_avg()

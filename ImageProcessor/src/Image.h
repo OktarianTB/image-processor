@@ -36,6 +36,8 @@ struct Image
 	Image& flipY();
 
 	Image& crop(uint16_t cx, uint16_t cy, uint16_t ch, uint16_t cw);
+	Image& resize(int new_width, int new_height);
+	Image& scale(double ratio);
 
 	Image& grayscale_avg();
 	Image& grayscale_lum();
