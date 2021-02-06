@@ -5,7 +5,7 @@
 #include "stb_image_write.h"
 #include <iostream>
 #define BYTE_BOUND(x) x < 0 ? 0 : (x > 255 ? 255 : x)
-#define MAP_BLACK_WHITE(x) x < 115 ? 0 : 255;
+#define MAP_BLACK_WHITE(x, cutoff) x <= cutoff ? 0 : 255;
 
 using namespace std;
 
@@ -127,26 +127,26 @@ Image& Image::flipY()
 	return *this;
 }
 
-Image& Image::crop(uint16_t cx, uint16_t cy, uint16_t ch, uint16_t cw)
+Image& Image::crop(uint16_t start_x, uint16_t start_y, uint16_t new_height, uint16_t new_width)
 {
-	size = cw * ch * channels;
+	size = new_width * new_height * channels;
 	uint8_t* croppedImage = new uint8_t[size];
 	memset(croppedImage, 0, size);
 
-	for (uint16_t y = 0; y < ch; ++y)
+	for (uint16_t y = 0; y < new_height; ++y)
 	{
-		if (y + cy >= height) break;
+		if (y + start_y >= height) break;
 
-		for (uint16_t x = 0; x < cw; ++x)
+		for (uint16_t x = 0; x < new_width; ++x)
 		{
-			if (x + cx >= width) break;
+			if (x + start_x >= width) break;
 
-			memcpy(&croppedImage[(x + y * cw) * channels], &data[(x + cx + (cy + y) * width) * channels], channels);
+			memcpy(&croppedImage[(x + y * new_width) * channels], &data[(x + start_x + (start_y + y) * width) * channels], channels);
 		}
 	}
 
-	width = cw;
-	height = ch;
+	width = new_width;
+	height = new_height;
 
 	delete[] data;
 	data = croppedImage;
@@ -166,9 +166,9 @@ Image& Image::resize(int new_width, int new_height)
 	uint8_t* dst = new uint8_t[new_size];
 	memset(dst, 0, new_size);
 
-	for (uint16_t y = 0; y < new_height; ++y)
+	for (int y = 0; y < new_height; ++y)
 	{
-		for (uint16_t x = 0; x < new_width; ++x)
+		for (int x = 0; x < new_width; ++x)
 		{
 			int px = x * x_ratio;
 			int py = y * y_ratio;
@@ -238,7 +238,7 @@ Image& Image::grayscale_lum()
 	return *this;
 }
 
-Image& Image::colorMask(float r, float g, float b)
+Image& Image::color_mask(float r, float g, float b)
 {
 	if (channels < 3)
 	{
@@ -251,114 +251,6 @@ Image& Image::colorMask(float r, float g, float b)
 			data[i] *= r;
 			data[i+1] *= g;
 			data[i+2] *= b;
-		}
-	}
-
-	return *this;
-}
-
-Image& Image::diffMap(Image& img)
-{
-	int compare_width = fmin(width, img.width);
-	int compare_height = fmin(height, img.height);
-	int compare_channels = fmin(channels, img.channels);
-
-	for (uint32_t i = 0; i < compare_height; ++i)
-	{
-		for (uint32_t j = 0; j < compare_width; ++j)
-		{
-			for (uint32_t k = 0; k < compare_channels; ++k)
-			{
-				data[(i * width + j) * channels + k] = BYTE_BOUND(abs(data[(i * width + j) * channels + k] -
-					img.data[(i * img.width + j) * img.channels + k]));
-			}
-		}
-	}
-
-	return *this;
-}
-
-Image& Image::diffMap_scale(Image& img, uint8_t scale)
-{
-	int compare_width = fmin(width, img.width);
-	int compare_height = fmin(height, img.height);
-	int compare_channels = fmin(channels, img.channels);
-
-	uint8_t largest = 0;
-	for (uint32_t i = 0; i < compare_height; ++i)
-	{
-		for (uint32_t j = 0; j < compare_width; ++j)
-		{
-			for (uint32_t k = 0; k < compare_channels; ++k)
-			{
-				data[(i * width + j) * channels + k] = BYTE_BOUND(abs(data[(i * width + j) * channels + k] -
-					img.data[(i * img.width + j) * img.channels + k]));
-				largest = fmax(largest, data[(i * width + j) * channels + k]);
-			}
-		}
-	}
-
-	scale = 255 / fmax(1, fmax(scale, largest));
-
-	for (int i = 0; i < size; ++i)
-	{
-		data[i] *= scale;
-	}
-
-	return *this;
-}
-
-Image& Image::overlay(const Image& source, int x, int y)
-{
-	uint8_t* srcPx;
-	uint8_t* dstPx;
-	for (int sy = 0; sy < source.height; ++sy)
-	{
-		if (sy + y < 0) continue;
-		else if (sy + y >= height) break;
-
-		for (int sx = 0; sx < source.width; ++sx)
-		{
-			if (sx + x < 0) continue;
-			else if (sx + x >= width) break;
-
-			srcPx = &source.data[(sx + sy * source.width) * source.channels];
-			dstPx = &data[(sx + x + (sy + y) * width) * channels];
-
-			float srcAlpha = source.channels < 4 ? 1 : srcPx[3] / 255.f;
-			float dstAlpha = channels < 4 ? 1 : dstPx[3] / 255.f;
-
-			if (srcAlpha >= 0.99 && dstAlpha >= 0.99)
-			{
-				if (source.channels >= channels)
-				{
-					memcpy(dstPx, srcPx, channels);
-				}
-				else
-				{
-					memset(dstPx, srcPx[0], channels);
-				}
-			}
-			else
-			{
-				float outAlpha = srcAlpha + dstAlpha * (1 - srcAlpha);
-				if (outAlpha < 0.01)
-				{
-					memset(dstPx, 0, channels);
-				}
-				else
-				{
-					for (int chnl = 0; chnl < channels; ++chnl)
-					{
-						dstPx[chnl] = (uint8_t)BYTE_BOUND((srcPx[chnl] / 255.f * srcAlpha + dstPx[chnl] / 255.f * dstAlpha * (1 - srcAlpha)) / outAlpha * 255.f);
-					}
-
-					if (channels > 3)
-					{
-						dstPx[3] = (uint8_t)BYTE_BOUND(outAlpha * 255.f);
-					}
-				}
-			}
 		}
 	}
 
@@ -457,10 +349,7 @@ Image& Image::gaussian_blur(int strength)
 	}
 
 	uint8_t* temp = new uint8_t[size];
-	uint8_t* dst = new uint8_t[size];
-
 	memset(temp, 0, size);
-	memset(dst, 0, size);
 
 	int N = (kernel_length - 1) / 2;
 
@@ -500,22 +389,16 @@ Image& Image::gaussian_blur(int strength)
 				}
 
 				uint8_t new_value = round(sum);
-				dst[(y * width + x) * channels + channel] = BYTE_BOUND(new_value);
+				data[(y * width + x) * channels + channel] = BYTE_BOUND(new_value);
 			}
 		}
 	}
 
-	for (size_t i = 0; i < size; ++i)
-	{
-		data[i] = dst[i];
-	}
-
 	delete[] temp;
-	delete[] dst;
 	return *this;
 }
 
-Image& Image::edge_detection()
+Image& Image::edge_detection(double cutoff)
 {
 	grayscale_avg();
 
@@ -577,7 +460,7 @@ Image& Image::edge_detection()
 
 	for (size_t i = 0; i < size; ++i)
 	{
-		data[i] = MAP_BLACK_WHITE(round(sqrt(tempX[i] * tempX[i] + tempY[i] * tempY[i])));
+		data[i] = MAP_BLACK_WHITE(round(sqrt(tempX[i] * tempX[i] + tempY[i] * tempY[i])), cutoff);
 	}
 
 	delete[] tempX;
@@ -587,76 +470,41 @@ Image& Image::edge_detection()
 
 Image& Image::sharpen()
 {
-	
-	return *this;
-}
+	double kernel[] = { -0.11111, -0.11111, -0.11111, -0.11111, 2, -0.11111, -0.11111, -0.11111, -0.11111 };
 
+	uint8_t* dst = new uint8_t[size];
+	memset(dst, 0, size);
 
-Image& Image::std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, uint32_t kernel_height, double kernel[], uint32_t cr, uint32_t cc)
-{
-	uint8_t* new_data = new uint8_t[width * height];
-	uint64_t center = (uint64_t)cr * kernel_width + (uint32_t)cc;
-	//printf("%" PRIu64 "\n", center);
-
-	for (uint64_t k = channel; k < size; k += channels)
+	// Apply sharpening kernel
+	for (int y = 0; y < height; ++y)
 	{
-		double c = 0;
-		long i = -((long)cr);
-		long end = (long)kernel_height - cr;
-		//std::cout << "i: " << i << " - " << end << std::endl;
-		while (i < end)
+		for (int x = 0; x < width; ++x)
 		{
-			i++;
-			long row = ((long)k / channels) / width - i;
-			if (row < 0 || row > height - 1)
+			for (int channel = 0; channel < channels; ++channel)
 			{
-				continue;
-			}
+				double sum = 0;
 
-			long j = -((long)cc);
-			long inner_end = (long)kernel_width - cc;
-			//std::cout << "j: " << j << " - " << inner_end << std::endl;
-			while (j < inner_end)
-			{
-				j++;
-				long col = ((long)k / channels) % width - j;
-				if (col < 0 || col > width - 1)
-				{
-					continue;
+				for (int i = -1; i <= 1; i++) {
+					for (int j = -1; j <= 1; ++j)
+					{
+						int kernel_index = 4 + i * 3 + j;
+						int index = (get_border_values(height, y + i) * width + get_border_values(width, x + j)) * channels + channel;
+						sum += kernel[kernel_index] * data[index];						
+					}
 				}
-				
-				long k_w = (long)kernel_width;
-				long index = center + i * k_w + j;
-				//std::cout << "index: " << index << std::endl;
 
-				c += kernel[index] * data[(row * width + col) * channels + channel];
-				cout << kernel[index] * data[(row * width + col) * channels + channel] << endl;
+				dst[(y * width + x) * channels + channel] = BYTE_BOUND(round(sum));
 			}
 		}
-
-		new_data[k / channels] = (uint8_t)BYTE_BOUND(round(c));
-		cout << "total: " << round(c) << endl;
-		cout << "----------------" << endl;
-		//printf("%" PRIu8 "\n", (uint8_t)round(c));
-		//printf("New Data:%" PRIu8 "\n", new_data[k / channels]);
-		
 	}
 
-
-	for (uint64_t k = channel; k < size; k += channels)
+	for (size_t i = 0; i < size; ++i)
 	{
-		data[k] = new_data[k / channels];
-		//printf("Data: %" PRIu8 "\n", data[k]);
+		data[i] = (dst[i] + data[i]) / 2;
 	}
+
+	delete[] dst;
+	dst = nullptr;
 
 	return *this;
 }
-
-
-
-
-
-
-
-
-

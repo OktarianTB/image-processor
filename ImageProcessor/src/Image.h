@@ -35,28 +35,20 @@ struct Image
 	Image& flipX();
 	Image& flipY();
 
-	Image& crop(uint16_t cx, uint16_t cy, uint16_t ch, uint16_t cw);
+	Image& crop(uint16_t start_x, uint16_t start_y, uint16_t new_height, uint16_t new_width);
 	Image& resize(int new_width, int new_height);
 	Image& scale(double ratio);
 
 	Image& grayscale_avg();
 	Image& grayscale_lum();
 
-	Image& colorMask(float r, float g, float b);
-
-	Image& diffMap(Image& img);
-	Image& diffMap_scale(Image& img, uint8_t scale = 0);
-
-	Image& overlay(const Image& source, int x, int y);
+	Image& color_mask(float r, float g, float b);
 
 	Image& pixelize(int strength = 2);
 
 	Image& gaussian_blur(int strength = 2);
-	Image& edge_detection();
+	Image& edge_detection(double cutoff = 115);
 	Image& sharpen();
-
-	Image& std_convolve_clamp_to_0(uint8_t channel, uint32_t kernel_width, 
-		uint32_t kernel_height, double kernel[], uint32_t cr, uint32_t cc);
 };
 
 

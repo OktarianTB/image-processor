@@ -2,5 +2,5 @@
 .vs/
 Debug/
 ImageProcessor/Debug
-*.png
-*.jpg
+ImageProcessor/*.png
+ImageProcessor/*.jpg
